@@ -16,30 +16,28 @@ import { Card } from "@/components/Cards";
 import Filters from "@/components/Filters";
 import NoResults from "@/components/NoResults";
 
-import { getProperties } from "@/lib/appwrite";
-import { useAppwrite } from "@/lib/useAppwrite";
+import { getProperties } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";
+import { Property } from "@/lib/types";
 
 const Explore = () => {
   const params = useLocalSearchParams<{ query?: string; filter?: string }>();
 
-  const {
+  const { 
     data: properties,
-    refetch,
-    loading,
-  } = useAppwrite({
-    fn: getProperties,
-    params: {
-      filter: params.filter!,
-      query: params.query!,
-    },
-    skip: true,
+    isLoading: loading,
+    refetch
+  } = useQuery({
+    queryKey: ['properties', params.query, params.filter],
+    queryFn: () => getProperties({ 
+      query: params.query || '',
+      filter: params.filter as any,
+      limit: 10
+    })
   });
 
   useEffect(() => {
-    refetch({
-      filter: params.filter!,
-      query: params.query!,
-    });
+    refetch();
   }, [params.filter, params.query]);
 
   const handleCardPress = (id: string) => router.push(`/properties/${id}`);
@@ -49,10 +47,10 @@ const Explore = () => {
       <FlatList
         data={properties}
         numColumns={2}
-        renderItem={({ item }) => (
-          <Card item={item} onPress={() => handleCardPress(item.$id)} />
+        renderItem={({ item }: { item: Property }) => (
+          <Card item={item} onPress={() => handleCardPress(item.id)} />
         )}
-        keyExtractor={(item) => item.$id}
+        keyExtractor={(item: Property) => item.id}
         contentContainerClassName="pb-32"
         columnWrapperClassName="flex gap-5 px-5"
         showsVerticalScrollIndicator={false}
@@ -85,7 +83,7 @@ const Explore = () => {
               <Filters />
 
               <Text className="text-xl font-rubik-bold text-black-300 mt-5">
-                Found {properties?.length} Properties
+                Found {properties?.length || 0} Properties
               </Text>
             </View>
           </View>

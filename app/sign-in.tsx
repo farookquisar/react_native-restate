@@ -9,7 +9,7 @@ import {
   View,
 } from "react-native";
 
-import { login } from "@/lib/appwrite";
+import { supabase } from "@/lib/supabase";
 import { Redirect } from "expo-router";
 import { useGlobalContext } from "@/lib/global-provider";
 import icons from "@/constants/icons";
@@ -21,10 +21,20 @@ const Auth = () => {
   if (!loading && isLogged) return <Redirect href="/" />;
 
   const handleLogin = async () => {
-    const result = await login();
-    if (result) {
-      refetch();
-    } else {
+    try {
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: window.location.origin
+        }
+      });
+
+      if (error) {
+        Alert.alert("Error", error.message);
+      } else {
+        refetch();
+      }
+    } catch (error) {
       Alert.alert("Error", "Failed to login");
     }
   };

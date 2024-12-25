@@ -7,6 +7,7 @@ import {
   View,
   Dimensions,
   Platform,
+  ActivityIndicator,
 } from "react-native";
 import { router, useLocalSearchParams } from "expo-router";
 
@@ -15,20 +16,34 @@ import images from "@/constants/images";
 import Comment from "@/components/Comment";
 import { facilities } from "@/constants/data";
 
-import { useAppwrite } from "@/lib/useAppwrite";
-import { getPropertyById } from "@/lib/appwrite";
+import { getPropertyById, getPropertyReviews } from "@/lib/supabase";
+import { useQuery } from "@tanstack/react-query";
+import { Property as PropertyType, Review } from "@/lib/types";
 
 const Property = () => {
   const { id } = useLocalSearchParams<{ id?: string }>();
 
   const windowHeight = Dimensions.get("window").height;
 
-  const { data: property } = useAppwrite({
-    fn: getPropertyById,
-    params: {
-      id: id!,
-    },
+  const { data: property, isLoading: propertyLoading } = useQuery<PropertyType | null>({
+    queryKey: ['property', id],
+    queryFn: () => getPropertyById(id!),
+    enabled: !!id
   });
+
+  const { data: reviews } = useQuery<Review[]>({
+    queryKey: ['property-reviews', id],
+    queryFn: () => getPropertyReviews(id!),
+    enabled: !!id
+  });
+
+  if (!id || propertyLoading) {
+    return (
+      <View className="flex-1 items-center justify-center">
+        <ActivityIndicator size="large" />
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -38,7 +53,7 @@ const Property = () => {
       >
         <View className="relative w-full" style={{ height: windowHeight / 2 }}>
           <Image
-            source={{ uri: property?.image }}
+            source={{ uri: property?.images?.[0] }}
             className="size-full"
             resizeMode="cover"
           />
@@ -75,20 +90,20 @@ const Property = () => {
 
         <View className="px-5 mt-7 flex gap-2">
           <Text className="text-2xl font-rubik-extrabold">
-            {property?.name}
+            {property?.title}
           </Text>
 
           <View className="flex flex-row items-center gap-3">
             <View className="flex flex-row items-center px-4 py-2 bg-primary-100 rounded-full">
               <Text className="text-xs font-rubik-bold text-primary-300">
-                {property?.type}
+                {property?.category}
               </Text>
             </View>
 
             <View className="flex flex-row items-center gap-2">
               <Image source={icons.star} className="size-5" />
               <Text className="text-black-200 text-sm mt-1 font-rubik-medium">
-                {property?.rating} ({property?.reviews.length} reviews)
+                {property?.average_rating?.toFixed(1)} ({reviews?.length} reviews)
               </Text>
             </View>
           </View>
@@ -98,156 +113,119 @@ const Property = () => {
               <Image source={icons.bed} className="size-4" />
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
-              {property?.bedrooms} Beds
+              {property?.bedrooms || 0} Beds
             </Text>
             <View className="flex flex-row items-center justify-center bg-primary-100 rounded-full size-10 ml-7">
               <Image source={icons.bath} className="size-4" />
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
-              {property?.bathrooms} Baths
+              {property?.bathrooms || 0} Baths
             </Text>
             <View className="flex flex-row items-center justify-center bg-primary-100 rounded-full size-10 ml-7">
               <Image source={icons.area} className="size-4" />
             </View>
             <Text className="text-black-300 text-sm font-rubik-medium ml-2">
-              {property?.area} sqft
+              {property?.area || 0} sqft
             </Text>
-          </View>
-
-          <View className="w-full border-t border-primary-200 pt-7 mt-5">
-            <Text className="text-black-300 text-xl font-rubik-bold">
-              Agent
-            </Text>
-
-            <View className="flex flex-row items-center justify-between mt-4">
-              <View className="flex flex-row items-center">
-                <Image
-                  source={{ uri: property?.agent.avatar }}
-                  className="size-14 rounded-full"
-                />
-
-                <View className="flex flex-col items-start justify-center ml-3">
-                  <Text className="text-lg text-black-300 text-start font-rubik-bold">
-                    {property?.agent.name}
-                  </Text>
-                  <Text className="text-sm text-black-200 text-start font-rubik-medium">
-                    {property?.agent.email}
-                  </Text>
-                </View>
-              </View>
-
-              <View className="flex flex-row items-center gap-3">
-                <Image source={icons.chat} className="size-7" />
-                <Image source={icons.phone} className="size-7" />
-              </View>
-            </View>
           </View>
 
           <View className="mt-7">
-            <Text className="text-black-300 text-xl font-rubik-bold">
-              Overview
-            </Text>
-            <Text className="text-black-200 text-base font-rubik mt-2">
+            <Text className="text-xl font-rubik-bold text-black-300">Description</Text>
+            <Text className="text-black-200 text-sm mt-3 leading-5 font-rubik-regular">
               {property?.description}
             </Text>
           </View>
 
           <View className="mt-7">
-            <Text className="text-black-300 text-xl font-rubik-bold">
-              Facilities
+            <Text className="text-xl font-rubik-bold text-black-300">Location</Text>
+            <Text className="text-black-200 text-sm mt-3 leading-5 font-rubik-regular">
+              {property?.address}
             </Text>
-
-            {property?.facilities.length > 0 && (
-              <View className="flex flex-row flex-wrap items-start justify-start mt-2 gap-5">
-                {property?.facilities.map((item: string, index: number) => {
-                  const facility = facilities.find(
-                    (facility) => facility.title === item
-                  );
-
-                  return (
-                    <View
-                      key={index}
-                      className="flex flex-1 flex-col items-center min-w-16 max-w-20"
-                    >
-                      <View className="size-14 bg-primary-100 rounded-full flex items-center justify-center">
-                        <Image
-                          source={facility ? facility.icon : icons.info}
-                          className="size-6"
-                        />
-                      </View>
-
-                      <Text
-                        numberOfLines={1}
-                        ellipsizeMode="tail"
-                        className="text-black-300 text-sm text-center font-rubik mt-1.5"
-                      >
-                        {item}
-                      </Text>
-                    </View>
-                  );
-                })}
-              </View>
-            )}
           </View>
 
-          {property?.gallery.length > 0 && (
+          <View className="mt-7">
+            <Text className="text-xl font-rubik-bold text-black-300">Features</Text>
+            <View className="flex flex-row flex-wrap gap-5 mt-5">
+              {facilities.map((facility) => (
+                <View
+                  key={facility.title}
+                  className={`flex flex-row items-center gap-2 px-4 py-2 rounded-full ${
+                    property?.features?.[facility.key as keyof NonNullable<PropertyType['features']>]
+                      ? "bg-primary-100"
+                      : "bg-black-100"
+                  }`}
+                >
+                  <Image
+                    source={facility.icon}
+                    className="size-4"
+                    tintColor={
+                      property?.features?.[facility.key as keyof NonNullable<PropertyType['features']>]
+                        ? "#1F4C6B"
+                        : "#191D31"
+                    }
+                  />
+                  <Text
+                    className={`text-xs font-rubik-medium ${
+                      property?.features?.[facility.key as keyof NonNullable<PropertyType['features']>]
+                        ? "text-primary-300"
+                        : "text-black-300"
+                    }`}
+                  >
+                    {facility.title}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {property?.images && property.images.length > 1 && (
             <View className="mt-7">
-              <Text className="text-black-300 text-xl font-rubik-bold">
-                Gallery
-              </Text>
-              <FlatList
-                contentContainerStyle={{ paddingRight: 20 }}
-                data={property?.gallery}
-                keyExtractor={(item) => item.$id}
+              <Text className="text-xl font-rubik-bold text-black-300">Gallery</Text>
+              <ScrollView
                 horizontal
                 showsHorizontalScrollIndicator={false}
-                renderItem={({ item }) => (
+                contentContainerStyle={{ gap: 15 }}
+                className="mt-5"
+              >
+                {property.images.slice(1).map((image, index) => (
                   <Image
-                    source={{ uri: item.image }}
-                    className="size-40 rounded-xl"
+                    key={index}
+                    source={{ uri: image }}
+                    className="w-40 h-28 rounded-xl"
                   />
-                )}
-                contentContainerClassName="flex gap-4 mt-3"
-              />
+                ))}
+              </ScrollView>
             </View>
           )}
 
-          <View className="mt-7">
-            <Text className="text-black-300 text-xl font-rubik-bold">
-              Location
-            </Text>
-            <View className="flex flex-row items-center justify-start mt-4 gap-2">
-              <Image source={icons.location} className="w-7 h-7" />
-              <Text className="text-black-200 text-sm font-rubik-medium">
-                {property?.address}
-              </Text>
-            </View>
-
-            <Image
-              source={images.map}
-              className="h-52 w-full mt-5 rounded-xl"
-            />
-          </View>
-
-          {property?.reviews.length > 0 && (
+          {(reviews?.length ?? 0) > 0 && (
             <View className="mt-7">
               <View className="flex flex-row items-center justify-between">
                 <View className="flex flex-row items-center">
-                  <Image source={icons.star} className="size-6" />
                   <Text className="text-black-300 text-xl font-rubik-bold ml-2">
-                    {property?.rating} ({property?.reviews.length} reviews)
+                    {property?.average_rating?.toFixed(1)} ({reviews?.length} reviews)
                   </Text>
                 </View>
 
                 <TouchableOpacity>
-                  <Text className="text-primary-300 text-base font-rubik-bold">
-                    View All
+                  <Text className="text-primary-300 text-sm font-rubik-medium">
+                    See All
                   </Text>
                 </TouchableOpacity>
               </View>
 
               <View className="mt-5">
-                <Comment item={property?.reviews[0]} />
+                {reviews?.[0] && (
+                  <Comment
+                    item={{
+                      id: reviews[0].id,
+                      name: "Anonymous User", // Since we don't have user data yet
+                      avatar: "", // You might want to add a default avatar
+                      review: reviews[0].comment || "",
+                      createdAt: reviews[0].created_at
+                    }}
+                  />
+                )}
               </View>
             </View>
           )}

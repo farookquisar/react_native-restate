@@ -9,11 +9,13 @@ import {
   View,
 } from "react-native";
 
-import { logout } from "@/lib/appwrite";
 import { useGlobalContext } from "@/lib/global-provider";
 
 import icons from "@/constants/icons";
 import { settings } from "@/constants/data";
+import { useEffect, useState } from 'react';
+import { supabase } from '../../../lib/supabase';
+import { UserProfile } from '../../../lib/types';
 
 interface SettingsItemProp {
   icon: ImageSourcePropType;
@@ -46,14 +48,33 @@ const SettingsItem = ({
 );
 
 const Profile = () => {
-  const { user, refetch } = useGlobalContext();
+  const { user } = useGlobalContext();
+  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    if (user) {
+      supabase
+        .from('rn_05_user_profiles')
+        .select('*')
+        .eq('id', user.id)
+        .single()
+        .then(({ data, error }) => {
+          if (!error && data) {
+            setUserProfile(data);
+          }
+        });
+    }
+  }, [user]);
 
   const handleLogout = async () => {
-    const result = await logout();
-    if (result) {
-      Alert.alert("Success", "Logged out successfully");
-      refetch();
-    } else {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        Alert.alert("Error", error.message);
+      } else {
+        Alert.alert("Success", "Logged out successfully");
+      }
+    } catch (error) {
       Alert.alert("Error", "Failed to logout");
     }
   };
@@ -72,14 +93,14 @@ const Profile = () => {
         <View className="flex flex-row justify-center mt-5">
           <View className="flex flex-col items-center relative mt-5">
             <Image
-              source={{ uri: user?.avatar }}
+              source={{ uri: userProfile?.avatar_url || 'https://via.placeholder.com/150' }}
               className="size-44 relative rounded-full"
             />
             <TouchableOpacity className="absolute bottom-11 right-2">
               <Image source={icons.edit} className="size-9" />
             </TouchableOpacity>
 
-            <Text className="text-2xl font-rubik-bold mt-2">{user?.name}</Text>
+            <Text className="text-2xl font-rubik-bold mt-2">{userProfile?.name || user?.email}</Text>
           </View>
         </View>
 

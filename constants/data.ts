@@ -106,34 +106,42 @@ export const facilities = [
   {
     title: "Laundry",
     icon: icons.laundry,
+    key: "laundry"
   },
   {
     title: "Car Parking",
     icon: icons.carPark,
+    key: "carParking"
   },
   {
     title: "Sports Center",
     icon: icons.run,
+    key: "sportsCenter"
   },
   {
     title: "Cutlery",
     icon: icons.cutlery,
+    key: "cutlery"
   },
   {
     title: "Gym",
     icon: icons.dumbell,
+    key: "gym"
   },
   {
     title: "Swimming pool",
     icon: icons.swim,
+    key: "swimmingPool"
   },
   {
     title: "Wifi",
     icon: icons.wifi,
+    key: "wifi"
   },
   {
     title: "Pet Center",
     icon: icons.dog,
+    key: "petCenter"
   },
 ];
 

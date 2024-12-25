@@ -1,21 +1,15 @@
-import React, { createContext, useContext, ReactNode } from "react";
-
-import { getCurrentUser } from "./appwrite";
-import { useAppwrite } from "./useAppwrite";
-import { Redirect } from "expo-router";
+import React, { createContext, useContext, ReactNode, useEffect } from "react";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { User } from "@supabase/supabase-js";
+import { useCurrentUser } from "./queries";
+import { Alert } from "react-native";
 
 interface GlobalContextType {
   isLogged: boolean;
   user: User | null;
   loading: boolean;
+  error: Error | null;
   refetch: () => void;
-}
-
-interface User {
-  $id: string;
-  name: string;
-  email: string;
-  avatar: string;
 }
 
 const GlobalContext = createContext<GlobalContextType | undefined>(undefined);
@@ -24,14 +18,43 @@ interface GlobalProviderProps {
   children: ReactNode;
 }
 
+// Configure the query client
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 5 * 60 * 1000, // 5 minutes
+    },
+  },
+});
+
 export const GlobalProvider = ({ children }: GlobalProviderProps) => {
-  const {
-    data: user,
-    loading,
+  return (
+    <QueryClientProvider client={queryClient}>
+      <GlobalContextContent>{children}</GlobalContextContent>
+    </QueryClientProvider>
+  );
+};
+
+const GlobalContextContent = ({ children }: GlobalProviderProps) => {
+  const { 
+    data: user, 
+    isLoading,
+    error,
     refetch,
-  } = useAppwrite({
-    fn: getCurrentUser,
-  });
+  } = useCurrentUser();
+
+  // Handle error state
+  useEffect(() => {
+    if (error) {
+      Alert.alert(
+        "Error",
+        "Failed to fetch user data. Please try again later.",
+        [{ text: "OK" }]
+      );
+    }
+  }, [error]);
 
   const isLogged = !!user;
 
@@ -39,8 +62,9 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
     <GlobalContext.Provider
       value={{
         isLogged,
-        user,
-        loading,
+        user: user ?? null,
+        loading: isLoading,
+        error: error instanceof Error ? error : null,
         refetch,
       }}
     >
@@ -51,9 +75,9 @@ export const GlobalProvider = ({ children }: GlobalProviderProps) => {
 
 export const useGlobalContext = (): GlobalContextType => {
   const context = useContext(GlobalContext);
-  if (!context)
+  if (!context) {
     throw new Error("useGlobalContext must be used within a GlobalProvider");
-
+  }
   return context;
 };
 
